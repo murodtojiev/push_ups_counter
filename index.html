@@ -121,7 +121,10 @@ const CFG = {
   vis: 0.4, alpha: 0.4, swing: 28, minTop: 110, upAngle: 150, downAngle: 112, downSoft: 125, downDrop: 0.2,
   debounce: 350, holdMs: 1200, holdJitter: 20, plankLine: 125, standingRatio: 0.92,
   awayMs: 500, backMs: 1000, sideMargin: 0.05,
-  model: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",
+  // Model manbalari ketma-ket sinab koʻriladi: avval shu papkadagi fayl, keyin internetdagi nusxalar
+  models: ["./pose_landmarker_lite.task",
+    "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+    "https://huggingface.co/AndorML/Public/resolve/main/pose_landmarker_lite.task"],
   wasm: "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
 };
 const IDX = {L:{s:11,e:13,w:15,h:23,k:25,a:27}, R:{s:12,e:14,w:16,h:24,k:26,a:28}};
@@ -227,17 +230,27 @@ async function start(){
   cv.width=video.videoWidth; cv.height=video.videoHeight;
   $("intro").classList.add("hide");
   setStatus("Model yuklanmoqda…","warn");
-  try{
-    if(!S.landmarker){
+  if(!S.landmarker){
+    const errs=[];
+    try{
       const fs = await FilesetResolver.forVisionTasks(CFG.wasm);
-      const mk = delegate => PoseLandmarker.createFromOptions(fs,{
-        baseOptions:{modelAssetPath:CFG.model, delegate}, runningMode:"VIDEO", numPoses:1
-      });
-      try{ S.landmarker = await mk("GPU"); }catch{ S.landmarker = await mk("CPU"); }
+      for(const url of CFG.models){
+        setStatus("Model yuklanmoqda… ("+(url.startsWith("./")?"mahalliy":new URL(url).host)+")","warn");
+        for(const delegate of ["GPU","CPU"]){
+          try{
+            S.landmarker = await PoseLandmarker.createFromOptions(fs,{
+              baseOptions:{modelAssetPath:url, delegate}, runningMode:"VIDEO", numPoses:1});
+            break;
+          }catch(e){ errs.push(delegate+" "+url.slice(0,40)+": "+(e.message||e)); }
+        }
+        if(S.landmarker) break;
+      }
+    }catch(e){ errs.push("wasm: "+(e.message||e)); }
+    if(!S.landmarker){
+      setStatus("Modelni yuklab boʻlmadi. Pastdagi xatoni yuboring.","");
+      $("dbg").textContent=errs.join("\n");
+      return;
     }
-  }catch(e){
-    setStatus("Modelni yuklab boʻlmadi. Internetni tekshiring.","");
-    return;
   }
   S.tick=performance.now(); Rep.reset(); setPhase("counting"); loop();
 }
