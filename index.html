@@ -47,6 +47,8 @@ button:disabled{opacity:.45;cursor:default}
 .card h1{font-family:var(--num);font-size:2.6rem;margin:0;line-height:1}
 .card ol{margin:0;padding-left:1.2em;display:grid;gap:8px;line-height:1.4}
 .err{color:var(--bad);font-weight:600;min-height:1.4em}
+.tune{display:grid;gap:6px;color:var(--dim)}.tune input{width:100%;accent-color:var(--accent)}.tune strong{color:var(--text)}
+.dbg{font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;color:var(--dim);background:#0a1628;border:1px solid var(--line);border-radius:8px;padding:8px 10px;white-space:pre-wrap}
 dialog{background:var(--panel);color:var(--text);border:2px solid var(--line);border-radius:14px;padding:24px;min-width:min(90vw,380px)}
 dialog::backdrop{background:rgba(0,0,0,.7)}
 dialog .big{font-family:var(--num);font-weight:800;font-size:7rem;line-height:1}
@@ -70,6 +72,9 @@ dialog p{margin:6px 0}
       </div>
     </div>
     <div class="meta"><span>Vaqt: <strong id="time">0:00</strong></span><span>Rekord: <strong id="best">0</strong></span></div>
+    <div class="tune"><label for="swing">Sezgirlik (burchak farqi): <strong id="swingV">28°</strong></label>
+      <input type="range" id="swing" min="12" max="60" value="28"><small>Kichik qiymat = osonroq sanaydi</small></div>
+    <div class="dbg" id="dbg">Diagnostika: kamera yoqilgach shu yerda raqamlar chiqadi</div>
     <div class="ctrl">
       <button class="primary" id="btnMain">Boshlash</button>
       <button id="btnReset">Qayta</button>
@@ -94,7 +99,7 @@ dialog p{margin:6px 0}
     <ol>
       <li>Telefon yoki noutbukni polga, devorga qiya suyang va 1.5–2 metr uzoqlikka qoʻying.</li>
       <li>Kameraga yonboshdan yoki 45° burchakda turing. Yelka, tirsak, bilak va tos koʻrinsin.</li>
-      <li>Kadr yashil boʻlganda plank holatini oling va 2–3 soniya qimirlamang. Sanash oʻzi boshlanadi.</li>
+      <li>Plank holatini oling. Yelka, tirsak va bilak koʻrinib tursa, sanash darhol ishlaydi: pastga tushib, toʻliq koʻtarilsangiz — 1 ta.</li>
     </ol>
     <div class="err" id="err" role="alert"></div>
     <button class="primary" id="btnStart">Kamerani yoqish</button>
@@ -113,7 +118,7 @@ import {PoseLandmarker, FilesetResolver} from "https://cdn.jsdelivr.net/npm/@med
 
 /* ============ Sozlamalar ============ */
 const CFG = {
-  vis: 0.5, alpha: 0.4, upAngle: 150, downAngle: 112, downSoft: 125, downDrop: 0.2,
+  vis: 0.4, alpha: 0.4, swing: 28, minTop: 110, upAngle: 150, downAngle: 112, downSoft: 125, downDrop: 0.2,
   debounce: 350, holdMs: 1200, holdJitter: 20, plankLine: 125, standingRatio: 0.92,
   awayMs: 500, backMs: 1000, sideMargin: 0.05,
   model: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",
@@ -171,6 +176,22 @@ const S = {
   holdStart:null, holdA:null, badSince:null, goodSince:null,
   landmarker:null, stream:null, raf:0, lastVT:-1
 };
+/* Cho'qqi-vodiy hisoblagich: mutlaq burchaklarga emas, tirsak burchagidagi tebranishga tayanadi */
+const Rep = {
+  stage:"UP", hi:null, lo:null,
+  reset(){ this.stage="UP"; this.hi=null; this.lo=null; },
+  step(a){
+    if(this.hi==null){ this.hi=a; this.lo=a; }
+    if(this.stage==="UP"){
+      this.hi=Math.max(this.hi,a);
+      if(this.hi>=CFG.minTop && a<=this.hi-CFG.swing){ this.stage="DOWN"; this.lo=a; }
+    }else{
+      this.lo=Math.min(this.lo,a);
+      if(a>=this.lo+CFG.swing){ this.stage="UP"; this.hi=a; return true; }
+    }
+    return false;
+  }
+};
 const video=$("video"), cv=$("overlay"), ctx=cv.getContext("2d");
 
 function setStatus(t,cls=""){ const e=$("status"); e.textContent=t; e.className="banner "+cls; }
@@ -218,7 +239,7 @@ async function start(){
     setStatus("Modelni yuklab boʻlmadi. Internetni tekshiring.","");
     return;
   }
-  S.tick=performance.now(); setPhase("framing"); loop();
+  S.tick=performance.now(); Rep.reset(); setPhase("counting"); loop();
 }
 
 function stopCamera(){
@@ -248,9 +269,9 @@ function analyze(lm,wl){
   const vl=avg("L"), vr=avg("R");
   // faol tomonni tanlash (kichik gisterezis bilan, sakrashni oldini olish uchun)
   const want = vl>vr ? "L":"R", diff=Math.abs(vl-vr);
-  if(want!==S.side && diff>CFG.sideMargin){ S.side=want; S.a=null; S.h=null; }
+  if(want!==S.side && diff>CFG.sideMargin){ S.side=want; S.a=null; S.h=null; Rep.reset(); }
   const I=IDX[S.side];
-  const ready=[I.s,I.e,I.w,I.h].every(i=>lm[i].visibility>CFG.vis);
+  const ready=[I.s,I.e,I.w].every(i=>lm[i].visibility>CFG.vis);
   const theta=angle3(wl[I.s],wl[I.e],wl[I.w]);
   const shW=dist3(wl[11],wl[12])||0.35;
   const hRaw=Math.abs(wl[I.s].y-wl[I.w].y)/shW;           // H_norm
@@ -260,58 +281,34 @@ function analyze(lm,wl){
   const dy=Math.abs(lm[I.s].y-lm[I.h].y), dx=Math.abs(lm[I.s].x-lm[I.h].x);
   const standing = dy/Math.hypot(dx,dy||1e-6) > CFG.standingRatio;
   const posture = ready && line>=CFG.plankLine && !standing;
-  return {ready, posture, standing, line, I};
+  return {ready, posture, standing, line, I, vis:[lm[I.s].visibility,lm[I.e].visibility,lm[I.w].visibility]};
 }
 
+function dbg(m){
+  const t = m
+    ? `qoʻl: ${S.side} | koʻrinish s/e/w: ${m.vis.map(v=>v.toFixed(2)).join("/")}\ntirsak: ${Math.round(S.a)}° | oraliq: max ${Math.round(Rep.hi??0)}° min ${Math.round(Rep.lo??0)}°\nholat: ${Rep.stage} | sanaldi: ${S.count} | faza: ${S.phase}`
+    : `model odamni topmadi | faza: ${S.phase}`;
+  $("dbg").textContent=t;
+}
 function update(m, now){
-  if(!m){ if(S.phase==="framing") setStatus("Kadrda hech kim yoʻq","");
-          else if(S.phase==="counting") awayCheck(false,now); return; }
+  if(!m){ setStatus("Kadrda hech kim yoʻq — orqaga suring, tana koʻrinsin",""); dbg(null); return; }
   const a=S.a;
   $("angle").textContent=Math.round(a)+"°";
   const depth=clamp((CFG.upAngle-a)/(CFG.upAngle-CFG.downAngle),0,1);
   $("depth").style.height=(depth*75)+"%";
-
-  if(S.phase==="framing"){
-    if(!m.ready){ S.holdStart=null; return setStatus("Yelka, tirsak, bilak va tos koʻrinmayapti — orqaga suring","") }
-    if(!m.posture){ S.holdStart=null; return setStatus(m.standing ? "Tik turibsiz — plank holatini oling" : `Tana toʻgʻri chiziq boʻlsin (hozir ${Math.round(m.line)}°, kerak ${CFG.plankLine}°+)`,"ok") }
-    if(a<CFG.upAngle-15){ S.holdStart=null; return setStatus(`Qoʻllarni toʻgʻrilang (tirsak ${Math.round(a)}°)`,"warn") }
-    if(S.holdStart==null || Math.abs(a-S.holdA)>CFG.holdJitter){ S.holdStart=now; S.holdA=a; }
-    const left=CFG.holdMs-(now-S.holdStart);
-    if(left>0) return setStatus(`Qimirlamang… ${(left/1000).toFixed(1)} s`,"ok");
-    S.base={a, h:S.h}; S.stage="UP"; S.lastCount=0;
-    Sound.tone(880,0.25); setPhase("counting"); return;
-  }
-  if(S.phase==="away"){
-    if(m.posture){
-      S.goodSince ??= now;
-      setStatus("Plank holatiga qaytyapsiz…","warn");
-      if(now-S.goodSince>=CFG.backMs){ S.stage="UP"; setPhase("counting"); }
-    } else { S.goodSince=null; setStatus(m.standing?"Pauza: tik turibsiz":"Pauza: plank holatidan chiqdingiz","warn"); }
-    return;
-  }
-  if(S.phase==="counting"){
-    if(awayCheck(m.posture,now)) return;
-    const drop=1-S.h/S.base.h;
-    const isDown = a<=CFG.downAngle || (a<=CFG.downSoft && drop>=CFG.downDrop);
-    const isUp = a>=CFG.upAngle;
-    if(isDown && S.stage==="UP"){ S.stage="DOWN"; Sound.tone(440,0.1); }
-    else if(isUp && S.stage==="DOWN"){
-      S.stage="UP";
-      if(now-S.lastCount>=CFG.debounce){
-        S.lastCount=now; S.count++;
-        $("count").textContent=S.count;
-        const c=$("count"); c.classList.remove("bump"); void c.offsetWidth; c.classList.add("bump");
-        Sound.tone(1100,0.15); Sound.say(S.count);
-      }
+  dbg(m);
+  if(S.phase!=="counting") return;
+  if(!m.ready){ setStatus("Yelka, tirsak yoki bilak koʻrinmayapti — kamerani sozlang","warn"); return; }
+  if(Rep.step(a)){
+    const t=performance.now();
+    if(t-S.lastCount>=CFG.debounce){
+      S.lastCount=t; S.count++;
+      $("count").textContent=S.count;
+      const c=$("count"); c.classList.remove("bump"); void c.offsetWidth; c.classList.add("bump");
+      Sound.tone(1100,0.15); Sound.say(S.count);
     }
-    setStatus((S.stage==="DOWN"?"Pastda — yuqoriga koʻtariling":"Pastga tushing")+` · tirsak ${Math.round(a)}° · sanaldi: ${S.count}`,"ok");
-  }
-}
-function awayCheck(ok,now){
-  if(ok){ S.badSince=null; return false; }
-  S.badSince ??= now;
-  if(now-S.badSince>=CFG.awayMs){ setPhase("away"); Sound.tone(300,0.2); return true; }
-  return false;
+  }else if(Rep.stage==="DOWN"){ Sound.tone(440,0.05,0.12); }
+  setStatus((Rep.stage==="DOWN"?"Pastda — yuqoriga koʻtariling":"Pastga tushing")+` · tirsak ${Math.round(a)}° · sanaldi: ${S.count}`,"ok");
 }
 
 /* ============ Skelet chizish ============ */
@@ -336,7 +333,7 @@ function draw(lm,m){
 function reset(){
   S.count=0; S.elapsed=0; S.stage="UP"; S.base=null; S.a=null; S.h=null;
   $("count").textContent="0"; $("depth").style.height="0"; $("angle").textContent="--°";
-  if(S.stream) setPhase("framing");
+  Rep.reset(); if(S.stream) setPhase("counting");
 }
 function finish(){
   if(S.phase==="idle"||S.phase==="finished") return;
@@ -352,7 +349,7 @@ function finish(){
 $("btnStart").onclick=start;
 $("btnMain").onclick=()=>{
   if(S.phase==="idle"||S.phase==="finished"){ $("intro").classList.remove("hide"); $("btnStart").disabled=false; $("btnStart").textContent="Kamerani yoqish"; }
-  else if(S.phase==="paused") setPhase("framing");
+  else if(S.phase==="paused") setPhase("counting");
   else setPhase("paused"), setStatus("Pauza","warn");
 };
 $("btnReset").onclick=reset;
@@ -363,6 +360,12 @@ $("btnSound").onclick=e=>{
 };
 $("btnClose").onclick=()=>{ $("result").close(); reset(); $("intro").classList.remove("hide"); $("btnStart").disabled=false; $("btnStart").textContent="Kamerani yoqish"; };
 $("best").textContent=Store.best();
+(function(){
+  const el=$("swing"), out=$("swingV");
+  try{ const v=+localStorage.getItem("pushup_swing"); if(v>=12&&v<=60){ CFG.swing=v; el.value=v; } }catch{}
+  out.textContent=CFG.swing+"°";
+  el.oninput=()=>{ CFG.swing=+el.value; out.textContent=CFG.swing+"°"; try{ localStorage.setItem("pushup_swing",CFG.swing); }catch{} };
+})();
 </script>
 </body>
 </html>
