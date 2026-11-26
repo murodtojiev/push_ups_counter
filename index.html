@@ -74,7 +74,7 @@ dialog p{margin:6px 0}
     <div class="meta"><span>Vaqt: <strong id="time">0:00</strong></span><span>Rekord: <strong id="best">0</strong></span></div>
     <div class="tune"><label for="swing">Sezgirlik (burchak farqi): <strong id="swingV">28°</strong></label>
       <input type="range" id="swing" min="12" max="60" value="28"><small>Kichik qiymat = osonroq sanaydi</small></div>
-    <div class="dbg" id="dbg">Diagnostika: kamera yoqilgach shu yerda raqamlar chiqadi</div>
+    <div class="dbg" id="diag">Diagnostika: kamera yoqilgach shu yerda raqamlar chiqadi</div>
     <div class="ctrl">
       <button class="primary" id="btnMain">Boshlash</button>
       <button id="btnReset">Qayta</button>
@@ -248,7 +248,7 @@ async function start(){
     }catch(e){ errs.push("wasm: "+(e.message||e)); }
     if(!S.landmarker){
       setStatus("Modelni yuklab boʻlmadi. Pastdagi xatoni yuboring.","");
-      $("dbg").textContent=errs.join("\n");
+      $("diag").textContent=errs.join("\n");
       return;
     }
   }
@@ -297,19 +297,19 @@ function analyze(lm,wl){
   return {ready, posture, standing, line, I, vis:[lm[I.s].visibility,lm[I.e].visibility,lm[I.w].visibility]};
 }
 
-function dbg(m){
+function showDiag(m){
   const t = m
     ? `qoʻl: ${S.side} | koʻrinish s/e/w: ${m.vis.map(v=>v.toFixed(2)).join("/")}\ntirsak: ${Math.round(S.a)}° | oraliq: max ${Math.round(Rep.hi??0)}° min ${Math.round(Rep.lo??0)}°\nholat: ${Rep.stage} | sanaldi: ${S.count} | faza: ${S.phase}`
     : `model odamni topmadi | faza: ${S.phase}`;
-  $("dbg").textContent=t;
+  $("diag").textContent=t;
 }
 function update(m, now){
-  if(!m){ setStatus("Kadrda hech kim yoʻq — orqaga suring, tana koʻrinsin",""); dbg(null); return; }
+  if(!m){ setStatus("Kadrda hech kim yoʻq — orqaga suring, tana koʻrinsin",""); showDiag(null); return; }
   const a=S.a;
   $("angle").textContent=Math.round(a)+"°";
   const depth=clamp((CFG.upAngle-a)/(CFG.upAngle-CFG.downAngle),0,1);
   $("depth").style.height=(depth*75)+"%";
-  dbg(m);
+  showDiag(m);
   if(S.phase!=="counting") return;
   if(!m.ready){ setStatus("Yelka, tirsak yoki bilak koʻrinmayapti — kamerani sozlang","warn"); return; }
   if(Rep.step(a)){
