@@ -113,8 +113,8 @@ import {PoseLandmarker, FilesetResolver} from "https://cdn.jsdelivr.net/npm/@med
 
 /* ============ Sozlamalar ============ */
 const CFG = {
-  vis: 0.6, alpha: 0.3, upAngle: 155, downAngle: 90, downSoft: 105, downDrop: 0.4,
-  debounce: 400, holdMs: 2500, holdJitter: 12, plankLine: 145, standingRatio: 0.85,
+  vis: 0.5, alpha: 0.4, upAngle: 150, downAngle: 112, downSoft: 125, downDrop: 0.2,
+  debounce: 350, holdMs: 1200, holdJitter: 20, plankLine: 125, standingRatio: 0.92,
   awayMs: 500, backMs: 1000, sideMargin: 0.05,
   model: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",
   wasm: "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
@@ -273,8 +273,8 @@ function update(m, now){
 
   if(S.phase==="framing"){
     if(!m.ready){ S.holdStart=null; return setStatus("Yelka, tirsak, bilak va tos koʻrinmayapti — orqaga suring","") }
-    if(!m.posture){ S.holdStart=null; return setStatus("Kadr tayyor — plank holatini oling","ok") }
-    if(a<140){ S.holdStart=null; return setStatus("Qoʻllarni toʻgʻrilang","warn") }
+    if(!m.posture){ S.holdStart=null; return setStatus(m.standing ? "Tik turibsiz — plank holatini oling" : `Tana toʻgʻri chiziq boʻlsin (hozir ${Math.round(m.line)}°, kerak ${CFG.plankLine}°+)`,"ok") }
+    if(a<CFG.upAngle-15){ S.holdStart=null; return setStatus(`Qoʻllarni toʻgʻrilang (tirsak ${Math.round(a)}°)`,"warn") }
     if(S.holdStart==null || Math.abs(a-S.holdA)>CFG.holdJitter){ S.holdStart=now; S.holdA=a; }
     const left=CFG.holdMs-(now-S.holdStart);
     if(left>0) return setStatus(`Qimirlamang… ${(left/1000).toFixed(1)} s`,"ok");
@@ -304,7 +304,7 @@ function update(m, now){
         Sound.tone(1100,0.15); Sound.say(S.count);
       }
     }
-    setStatus(S.stage==="DOWN"?"Pastda — yuqoriga koʻtariling":"Pastga tushing","ok");
+    setStatus((S.stage==="DOWN"?"Pastda — yuqoriga koʻtariling":"Pastga tushing")+` · tirsak ${Math.round(a)}° · sanaldi: ${S.count}`,"ok");
   }
 }
 function awayCheck(ok,now){
