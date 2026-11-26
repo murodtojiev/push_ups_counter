@@ -23,7 +23,7 @@ button:disabled{opacity:.45;cursor:default}
 .app{max-width:1200px;margin:0 auto;display:grid;gap:12px;grid-template-columns:1fr}
 @media(min-width:900px){.app{grid-template-columns:minmax(0,1.5fr) minmax(320px,1fr);align-items:start}}
 .stage{position:relative;background:#000;border-radius:14px;overflow:hidden;aspect-ratio:var(--ar,4/3);width:100%;max-height:78vh;margin:0 auto}
-.stage video,.stage canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+.stage video,.stage canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;transform:scaleX(-1)}
 .banner{position:absolute;left:0;right:0;bottom:0;padding:12px 16px;font-weight:600;font-size:clamp(1rem,2.6vw,1.35rem);background:rgba(10,22,40,.82);border-top:4px solid var(--bad)}
 .banner.warn{border-color:var(--warn)} .banner.ok{border-color:var(--ok)}
 .hud{display:grid;gap:12px}
@@ -54,6 +54,34 @@ dialog::backdrop{background:rgba(0,0,0,.7)}
 dialog .big{font-family:var(--num);font-weight:800;font-size:7rem;line-height:1}
 dialog p{margin:6px 0}
 @media(prefers-reduced-motion:reduce){#count.bump{animation:none}.bar i{transition:none}}
+
+html{-webkit-text-size-adjust:100%}
+button,.bar{-webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none}
+.more{background:var(--panel);border-radius:10px;padding:8px 12px;display:grid}
+.more summary{cursor:pointer;min-height:32px;display:flex;align-items:center;color:var(--dim)}
+.more[open] summary{margin-bottom:8px}.more>*+*{margin-top:8px}
+.rotate{display:none;margin:0;padding:8px 12px;border-radius:10px;background:var(--panel);border-left:4px solid var(--warn)}
+@media(max-width:899px) and (orientation:portrait){
+  .rotate{display:block}
+  .stage{max-height:44vh}
+  #count{font-size:clamp(7rem,38vw,11rem)}
+  .bar{height:clamp(110px,18vh,180px)}
+}
+@media(orientation:landscape) and (max-height:560px){
+  body{padding:max(6px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))}
+  .app{max-width:none;grid-template-columns:minmax(0,1.5fr) minmax(230px,1fr);gap:8px;align-items:stretch;height:calc(100dvh - 12px)}
+  .stage{max-height:none;height:100%;aspect-ratio:auto}
+  .hud{grid-template-rows:minmax(0,1fr) auto auto auto;gap:6px;min-height:0}
+  .counter{padding:4px 10px;min-height:0}
+  #count{font-size:min(44vh,26vw)}
+  .bar{height:28vh;width:24px}
+  .angle{font-size:1.3rem}
+  .ctrl{grid-template-columns:1fr 1fr}.ctrl .primary{grid-column:1/-1}
+  button{padding:6px 10px;min-height:40px}
+  .banner{font-size:.95rem;padding:6px 10px}
+  .overlay{place-items:start center}.card h1{font-size:2rem}
+  dialog .big{font-size:4rem}
+}
 </style>
 </head>
 <body>
@@ -64,6 +92,7 @@ dialog p{margin:6px 0}
     <div class="banner" id="status">Kamera oʻchiq</div>
   </div>
   <section class="hud">
+    <p class="rotate">Telefonni gorizontal (yotiq) buring — butun tana kadrga sigʻadi.</p>
     <div class="counter">
       <div id="count" aria-live="polite">0</div>
       <div class="side">
@@ -72,9 +101,11 @@ dialog p{margin:6px 0}
       </div>
     </div>
     <div class="meta"><span>Vaqt: <strong id="time">0:00</strong></span><span>Rekord: <strong id="best">0</strong></span></div>
+    <details class="more"><summary>Sozlamalar va diagnostika</summary>
     <div class="tune"><label for="swing">Sezgirlik (burchak farqi): <strong id="swingV">28°</strong></label>
       <input type="range" id="swing" min="12" max="60" value="28"><small>Kichik qiymat = osonroq sanaydi</small></div>
     <div class="dbg" id="diag">Diagnostika: kamera yoqilgach shu yerda raqamlar chiqadi</div>
+    </details>
     <div class="ctrl">
       <button class="primary" id="btnMain">Boshlash</button>
       <button id="btnReset">Qayta</button>
@@ -87,17 +118,22 @@ dialog p{margin:6px 0}
 <section class="overlay" id="intro">
   <div class="card">
     <h1>Anjimaniya hisoblagich</h1>
-    <svg viewBox="0 0 360 150" role="img" aria-label="Telefon devorga suyalgan, odam 45° burchakda plankda turibdi" style="width:100%">
-      <line x1="10" y1="130" x2="350" y2="130" stroke="#25405f" stroke-width="3"/>
-      <rect x="16" y="60" width="14" height="70" rx="3" fill="#12233b" stroke="#ff6a2b" stroke-width="3" transform="rotate(12 23 130)"/>
-      <circle cx="268" cy="62" r="11" fill="#f2f5f9"/>
-      <path d="M255 72 L180 112 L110 128 M255 72 L262 128 M180 112 L186 128" stroke="#f2f5f9" stroke-width="7" stroke-linecap="round" fill="none"/>
-      <path d="M40 40 H100 M40 40 l8 -6 M40 40 l8 6 M100 40 l-8 -6 M100 40 l-8 6" stroke="#93a4ba" stroke-width="2" fill="none"/>
-      <text x="48" y="28" fill="#93a4ba" font-size="13">1.5–2 m</text>
-      <path d="M40 130 L170 88" stroke="#ff6a2b" stroke-width="2" stroke-dasharray="5 5"/>
+    <svg viewBox="0 0 360 165" role="img" aria-label="Telefon devorga suyalgan va yon tomondan plank holatidagi odamga qaragan" style="width:100%">
+      <line x1="8" y1="135" x2="352" y2="135" stroke="#25405f" stroke-width="3"/>
+      <line x1="10" y1="45" x2="10" y2="135" stroke="#25405f" stroke-width="5"/>
+      <rect x="18" y="82" width="13" height="53" rx="3" fill="#12233b" stroke="#ff6a2b" stroke-width="3" transform="rotate(-10 24 135)"/>
+      <circle cx="24" cy="92" r="2.5" fill="#ff6a2b"/>
+      <path d="M34 92 L150 62 M34 92 L150 140" stroke="#93a4ba" stroke-width="1.5" stroke-dasharray="5 5" fill="none"/>
+      <circle cx="120" cy="74" r="11" fill="#f2f5f9"/>
+      <path d="M302 126 L225 100 L140 82 M140 82 L140 131 M132 133 H150 M302 126 L309 134" stroke="#f2f5f9" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      <g fill="#ff6a2b"><circle cx="140" cy="82" r="5.5"/><circle cx="140" cy="107" r="5.5"/><circle cx="140" cy="130" r="5.5"/><circle cx="225" cy="100" r="5.5"/></g>
+      <path d="M34 150 H134 M34 150 l7 -4 M34 150 l7 4 M134 150 l-7 -4 M134 150 l-7 4" stroke="#93a4ba" stroke-width="2" fill="none"/>
+      <text x="84" y="162" fill="#93a4ba" font-size="12" text-anchor="middle">1.5–2 m</text>
+      <circle cx="104" cy="22" r="4.5" fill="#ff6a2b"/>
+      <text x="114" y="26" fill="#93a4ba" font-size="12">yelka, tirsak, bilak, tos</text>
     </svg>
     <ol>
-      <li>Telefon yoki noutbukni polga, devorga qiya suyang va 1.5–2 metr uzoqlikka qoʻying.</li>
+      <li>Telefonni gorizontal (yotiq) qilib polga, devorga qiya suyang va 1.5–2 metr uzoqlikka qoʻying.</li>
       <li>Kameraga yonboshdan yoki 45° burchakda turing. Yelka, tirsak, bilak va tos koʻrinsin.</li>
       <li>Plank holatini oling. Yelka, tirsak va bilak koʻrinib tursa, sanash darhol ishlaydi: pastga tushib, toʻliq koʻtarilsangiz — 1 ta.</li>
     </ol>
@@ -204,7 +240,16 @@ function setPhase(p){
 }
 
 /* ============ Kamera va model ============ */
+let wake=null;
+async function keepAwake(){ try{ wake=await navigator.wakeLock?.request("screen"); }catch{} }
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"&&S.stream) keepAwake(); });
+async function goLandscape(){
+  // faqat Android: toʻliq ekran + gorizontal qulf (iPhone buni qoʻllab-quvvatlamaydi — qoʻlda buring)
+  if(!/Android/i.test(navigator.userAgent)) return;
+  try{ await document.documentElement.requestFullscreen(); await screen.orientation.lock("landscape"); }catch{}
+}
 async function start(){
+  goLandscape();
   $("err").textContent="";
   if(!window.isSecureContext){
     $("err").textContent="Kamera faqat HTTPS yoki localhost orqali ishlaydi. Sahifani https:// manzildan oching.";
@@ -225,6 +270,7 @@ async function start(){
       : e.name==="NotFoundError" ? "Kamera topilmadi." : "Kamerani ochib boʻlmadi: "+e.message;
     return;
   }
+  keepAwake();
   video.srcObject=S.stream; await video.play();
   $("stage").style.setProperty("--ar", `${video.videoWidth}/${video.videoHeight}`);
   cv.width=video.videoWidth; cv.height=video.videoHeight;
@@ -255,7 +301,14 @@ async function start(){
   S.tick=performance.now(); Rep.reset(); setPhase("counting"); loop();
 }
 
+// telefon aylantirilganda video oʻlchami oʻzgaradi — canvas ham mos boʻlsin
+video.addEventListener("resize",()=>{
+  if(!video.videoWidth) return;
+  cv.width=video.videoWidth; cv.height=video.videoHeight;
+  $("stage").style.setProperty("--ar",`${video.videoWidth}/${video.videoHeight}`);
+});
 function stopCamera(){
+  try{ wake?.release(); wake=null; screen.orientation?.unlock?.(); if(document.fullscreenElement) document.exitFullscreen(); }catch{}
   cancelAnimationFrame(S.raf);
   S.stream?.getTracks().forEach(t=>t.stop()); S.stream=null;
 }
