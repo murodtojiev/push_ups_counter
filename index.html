@@ -60,27 +60,10 @@ button,.bar{-webkit-tap-highlight-color:transparent;touch-action:manipulation;us
 .more{background:var(--panel);border-radius:10px;padding:8px 12px;display:grid}
 .more summary{cursor:pointer;min-height:32px;display:flex;align-items:center;color:var(--dim)}
 .more[open] summary{margin-bottom:8px}.more>*+*{margin-top:8px}
-.rotate{display:none;margin:0;padding:8px 12px;border-radius:10px;background:var(--panel);border-left:4px solid var(--warn)}
-@media(max-width:899px) and (orientation:portrait){
-  .rotate{display:block}
+@media(max-width:899px){
   .stage{max-height:44vh}
   #count{font-size:clamp(7rem,38vw,11rem)}
   .bar{height:clamp(110px,18vh,180px)}
-}
-@media(orientation:landscape) and (max-height:560px){
-  body{padding:max(6px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))}
-  .app{max-width:none;grid-template-columns:minmax(0,1.5fr) minmax(230px,1fr);gap:8px;align-items:stretch;height:calc(100dvh - 12px)}
-  .stage{max-height:none;height:100%;aspect-ratio:auto}
-  .hud{grid-template-rows:minmax(0,1fr) auto auto auto;gap:6px;min-height:0}
-  .counter{padding:4px 10px;min-height:0}
-  #count{font-size:min(44vh,26vw)}
-  .bar{height:28vh;width:24px}
-  .angle{font-size:1.3rem}
-  .ctrl{grid-template-columns:1fr 1fr}.ctrl .primary{grid-column:1/-1}
-  button{padding:6px 10px;min-height:40px}
-  .banner{font-size:.95rem;padding:6px 10px}
-  .overlay{place-items:start center}.card h1{font-size:2rem}
-  dialog .big{font-size:4rem}
 }
 </style>
 </head>
@@ -92,7 +75,6 @@ button,.bar{-webkit-tap-highlight-color:transparent;touch-action:manipulation;us
     <div class="banner" id="status">Kamera oʻchiq</div>
   </div>
   <section class="hud">
-    <p class="rotate">Telefonni gorizontal (yotiq) buring — butun tana kadrga sigʻadi.</p>
     <div class="counter">
       <div id="count" aria-live="polite">0</div>
       <div class="side">
@@ -241,13 +223,7 @@ function setPhase(p){
 let wake=null;
 async function keepAwake(){ try{ wake=await navigator.wakeLock?.request("screen"); }catch{} }
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"&&S.stream) keepAwake(); });
-async function goLandscape(){
-  // faqat Android: toʻliq ekran + gorizontal qulf (iPhone buni qoʻllab-quvvatlamaydi — qoʻlda buring)
-  if(!/Android/i.test(navigator.userAgent)) return;
-  try{ await document.documentElement.requestFullscreen(); await screen.orientation.lock("landscape"); }catch{}
-}
 async function start(){
-  goLandscape();
   $("err").textContent="";
   if(!window.isSecureContext){
     $("err").textContent="Kamera faqat HTTPS yoki localhost orqali ishlaydi. Sahifani https:// manzildan oching.";
@@ -306,7 +282,7 @@ video.addEventListener("resize",()=>{
   $("stage").style.setProperty("--ar",`${video.videoWidth}/${video.videoHeight}`);
 });
 function stopCamera(){
-  try{ wake?.release(); wake=null; screen.orientation?.unlock?.(); if(document.fullscreenElement) document.exitFullscreen(); }catch{}
+  try{ wake?.release(); wake=null; }catch{}
   cancelAnimationFrame(S.raf);
   S.stream?.getTracks().forEach(t=>t.stop()); S.stream=null;
 }
